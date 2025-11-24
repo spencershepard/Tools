@@ -4,7 +4,7 @@
 # Quick Linux system reconnaissance script for CTF and sysadmin
 # Provides concise, scannable output about system state
 # Should work on most Linux distros without dependencies, including minimal containers
-#
+# 
 
 # Detect if output is to a terminal (enable colors) or pipe/file (disable colors)
 if [ -t 1 ]; then
@@ -86,8 +86,8 @@ print_info "Current: $CURRENT_USER (UID:$USER_ID) Groups: $USER_GROUPS"
 # Check sudo access
 if sudo -n true 2>/dev/null; then
     print_crit "SUDO: Passwordless sudo available!"
-elif sudo -l 2>/dev/null | grep -q "(ALL)"; then
-    print_warn "SUDO: User has sudo privileges (password required)"
+elif id -Gn 2>/dev/null | grep -Eq "(^| )(sudo|wheel)( |$)"; then
+    print_warn "SUDO: User in sudo/wheel group (password required)"
 else
     print_safe "SUDO: No sudo access"
 fi
@@ -96,6 +96,10 @@ fi
 TOTAL_USERS=$(cat /etc/passwd | wc -l)
 SHELL_USERS=$(cat /etc/passwd | grep -E "/(bash|sh|zsh|fish)$" | wc -l)
 print_info "Total users: $TOTAL_USERS | With shell access: $SHELL_USERS"
+# Docker group membership can allow root escalation via mounting host filesystem
+if id -Gn 2>/dev/null | grep -qw docker; then
+    print_warn "Docker group membership: potential privilege escalation"
+fi
 
 # List users with login shells (if reasonable number)
 if [ $SHELL_USERS -le 10 ]; then
@@ -182,8 +186,16 @@ print_info "Processes running as root: $ROOT_PROCS"
 
 # Check for containers
 if command -v docker >/dev/null 2>&1; then
-    DOCKER_CONTAINERS=$(docker ps 2>/dev/null | grep -v CONTAINER | wc -l)
-    [ $DOCKER_CONTAINERS -gt 0 ] && print_warn "Docker containers running: $DOCKER_CONTAINERS"
+    if docker ps >/dev/null 2>&1; then
+        DOCKER_CONTAINERS=$(docker ps 2>/dev/null | grep -v CONTAINER | wc -l)
+        if [ $DOCKER_CONTAINERS -gt 0 ]; then
+            print_warn "Docker containers running: $DOCKER_CONTAINERS"
+        else
+            print_info "Docker installed; no running containers"
+        fi
+    else
+        print_info "Docker installed; user lacks daemon access"
+    fi
 fi
 
 print_section "FILESYSTEM"
