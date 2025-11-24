@@ -4,7 +4,7 @@
 # Quick Linux system reconnaissance script for CTF and sysadmin
 # Provides concise, scannable output about system state
 # Should work on most Linux distros without dependencies, including minimal containers
-#
+# 
 
 # Detect if output is to a terminal (enable colors) or pipe/file (disable colors)
 if [ -t 1 ]; then
